@@ -35,32 +35,3 @@ int main () {
     }
     return 0;
 }
-/*
-int main() {
-
-    char Buf [BUFFER_SIZE];
-    int pid, status;
-    int n;
-
-    write(STDOUT_FILENO, MESSAGE, strlen(MESSAGE));
-    read(STDIN_FILENO, Buf,BUFFER_SIZE-1);
-    write(STDOUT_FILENO, Buf, strlen(Buf)-1);
-
-
-
-    read(STDIN_FILENO, Buf,BUFFER_SIZE-1);
-    Buf[ read(STDIN_FILENO, Buf,BUFFER_SIZE-1)-1]=0;
-
-    if (pid !=0)
-        {
-            wait(&status);
-        }
-    else
-        {
-            execlp(Buf,Buf,(char *)NULL);
-        }
-
-
-    return 0;
-}
-*/
