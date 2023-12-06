@@ -1,67 +1,124 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <time.h>
 
-#define byebye_ctrl_plus_d "Bye bye Ctrl+D...\n$"
+#define MAX_INPUT_SIZE 1024
 
-int main() {
-    char Buf[256];
-    char prompt[] = "enseash %% ";
-    char exitPrompt[] = "enseash [exit:";
-    char signPrompt[] = "enseash [sign:";
-    write(STDOUT_FILENO, prompt, sizeof(prompt) - 1);
+int last_exit_status = 0;
+int last_signal = 0;
+struct timespec start_time, end_time;
 
-    while (1)
-    {
+void welcome_message() {
+    const char welcome[] = "Welcome to the Mini Shell ENSEA.\nEnter 'exit' to quit.\n";
+    write(STDOUT_FILENO, welcome, strlen(welcome));
+}
+
+void display_prompt() {
+
+    char prompt[MAX_INPUT_SIZE];
+    if (last_exit_status != 0) {
+        // Build the prompt with exit indication and execution time
+        snprintf(prompt, sizeof(prompt), "enseash [exit:%d|%ldms] %% ", last_exit_status,
+                 (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_nsec - start_time.tv_nsec) / 1000000);
+    }
+        // Check if the last signal is non-zero
+    else if (last_signal != 0) {
+        // Build the prompt with signal indication and execution time
+        snprintf(prompt, sizeof(prompt), "enseash [signal:%d|%ldms] %% ", last_signal,
+                 (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_nsec - start_time.tv_nsec) / 1000000);
+    }
+    else {
+        snprintf(prompt, sizeof(prompt), "enseash %% ");
+    }
+
+    // Display the prompt
+    write(STDOUT_FILENO, prompt, strlen(prompt));
+}
+void execute_command(char *command) {
+    char *args[MAX_INPUT_SIZE];
+    char *token;
+
+    // Parse the command and arguments
+    int argc = 0;
+    token = strtok(command, " ");
+    while (token != NULL) {
+        args[argc++] = token;
+        token = strtok(NULL, " ");
+    }
+    args[argc] = NULL;
+
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    //creating process
+    pid_t pid = fork();
+
+    if (pid == -1) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {  // Child process
+        execvp(args[0], args);
+        perror("execvp");
+        exit(EXIT_FAILURE);
+    } else {  // Parent process
         int status;
+        waitpid(pid, &status, 0);
 
-        ssize_t cmd_size = read(STDIN_FILENO, Buf, sizeof(Buf) - 1);//Reading the Entered Command
-        Buf[cmd_size - 1] = '\0';  //Indicate the end of the message
-        //////////////////////////////////////////////////////////////////
-        //Handling the shell output with the "exit" command or a <ctrl>+d;//
-        if (strcmp(Buf, "exit") == 0)
-        {
-            break;
-        }
-        if (cmd_size==0)//"<ctrl>+d" command
-        {
-            write(STDOUT_FILENO, byebye_ctrl_plus_d, strlen(byebye_ctrl_plus_d));
-            break;
-        }
-
-        pid_t pid = fork();
-        if (pid == -1)//Handle error
-        {
-            perror("fork");
-            exit(EXIT_FAILURE);
-        }
-        if (pid == 0)
-        {
-            //Treat the child
-            execlp(Buf, Buf, (char *)NULL);
-            perror("execlp");
-            exit(EXIT_FAILURE);
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        if (WIFEXITED(status)) {
+            last_exit_status = WEXITSTATUS(status);
+            last_signal = 0;
+        } else if (WIFSIGNALED(status)) {
+            last_exit_status = 0;
+            last_signal = WTERMSIG(status);
         } else {
-            // Code du processus parent
-
-            waitpid(pid, &status, 0);//Wait for the thread to finish(child)
-            //Display of return code (or signal)//
-            if (WIFEXITED(status))//True if the child ended normally (exit or return)
-            {
-                write(STDOUT_FILENO, exitPrompt, sizeof(exitPrompt) - 1);
-                dprintf(STDOUT_FILENO, "%d", WEXITSTATUS(status));//Returns the output value of the child
-                write(STDOUT_FILENO, "] %% ", 5);
-            } else if (WIFSIGNALED(status))//true if the child ended because of a signal
-            {
-                write(STDOUT_FILENO, signPrompt, sizeof(signPrompt) - 1);
-                dprintf(STDOUT_FILENO, "%d", WTERMSIG(status));//returns the number of the signal that caused the termination
-                write(STDOUT_FILENO, "] %% ", 5);
-            }
+            last_exit_status = 0;
+            last_signal = 0;
         }
+    }
+}
+int main() {
+    char input[MAX_INPUT_SIZE];
+
+    welcome_message();
+
+    while (1) {
+        display_prompt();
+
+        // Read user input
+        ssize_t bytes_read = read(STDIN_FILENO, input, sizeof(input));
+
+        if (bytes_read == 0) {
+            // Handle end of file (Ctrl+D)
+            const char goodbye[] = "\nGoodbye...\n";
+            write(STDOUT_FILENO, goodbye, strlen(goodbye));
+            break;
+        }
+
+        // Remove the newline character
+        input[strcspn(input, "\n")] = '\0';
+
+        if (strcmp(input, "exit") == 0) {
+            const char goodbye[] = "Goodbye...\n";
+            write(STDOUT_FILENO, goodbye, strlen(goodbye));
+            break;
+        }
+
+        // Execute the entered command
+        execute_command(input);
     }
 
     return 0;
 }
+
