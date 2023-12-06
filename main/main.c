@@ -3,12 +3,14 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/wait.h>
+#include <stdlib.h>
 
 
 
 #define MESSAGE "$ ./enseash\nBienvenue dans le Shell ENSEA.\nPour quitter, tapez 'exit'.\nenseash %"
 #define BUFFER_SIZE 128
 #define enseash "enseash%"
+#define byebye "Bye bye...\n$"
 
 int main () {
     char Buf[BUFFER_SIZE];
@@ -32,6 +34,17 @@ int main () {
             execlp(Buf, Buf, (char *) NULL);//Treat the child
         }
         write(STDOUT_FILENO, enseash, strlen(enseash));
+        //Handling the shell output with the "exit" command or a <ctrl>+d;//
+        if (strcmp(Buf,"exit")==0)//"exit" command
+        {
+            write(STDOUT_FILENO, byebye, strlen(byebye));
+            exit(-1);
+        }
+        if (cmd_size==0)//"<ctrl>+d" command
+        {
+            write(STDOUT_FILENO, byebye, strlen(byebye));
+            exit(-1);
+        }
     }
     return 0;
 }
